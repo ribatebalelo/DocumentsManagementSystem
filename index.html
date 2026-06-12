@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocFlow — Document Management System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--bg2:#1a1d27;--bg3:#222535;--bg4:#2a2d3e;
+    --border:#2e3147;--border2:#3d4166;
+    --text:#e8eaf6;--text2:#9095b8;--text3:#5a5f7d;
+    --accent:#6366f1;--accent2:#4f46e5;--accent-light:#818cf8;
+    --green:#22c55e;--green-bg:#052e16;
+    --amber:#f59e0b;--amber-bg:#2d1a00;
+    --red:#ef4444;--red-bg:#2d0a0a;
+    --blue:#3b82f6;--blue-bg:#0c1a3a;
+    --purple:#a855f7;--purple-bg:#1e0a2e;
+    --radius:8px;--radius-lg:12px;--radius-xl:16px;
+    --shadow:0 4px 24px rgba(0,0,0,0.4);
+    --font:'Inter',system-ui,sans-serif;
+  }
+  body.light-mode{
+    --bg:#f0f2f8;--bg2:#ffffff;--bg3:#e8eaf2;--bg4:#dde0f0;
+    --border:#d0d4e8;--border2:#b8bdd8;
+    --text:#1a1d2e;--text2:#4a5070;--text3:#8890b0;
+    --accent:#6366f1;--accent2:#4f46e5;--accent-light:#4f46e5;
+    --green:#16a34a;--green-bg:#dcfce7;
+    --amber:#d97706;--amber-bg:#fef3c7;
+    --red:#dc2626;--red-bg:#fee2e2;
+    --blue:#2563eb;--blue-bg:#dbeafe;
+    --purple:#9333ea;--purple-bg:#f3e8ff;
+    --shadow:0 4px 24px rgba(0,0,0,0.1);
+  }
+  /* Theme toggle button */
+  #theme-toggle{position:fixed;bottom:18px;right:18px;z-index:8999;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:20px;padding:6px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:var(--font);transition:all .2s}
+  #theme-toggle:hover{background:var(--bg4);color:var(--text)}
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6}
+  a{color:var(--accent-light);text-decoration:none}
+
+  /* Layout */
+  #app{display:flex;height:100vh;overflow:hidden}
+  #sidebar{width:240px;min-width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .2s}
+  #sidebar.collapsed{width:64px;min-width:64px}
+  #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  #topbar{height:56px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+  #content{flex:1;overflow-y:auto;padding:24px}
+
+  /* Sidebar */
+  .sidebar-logo{padding:16px 16px 8px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);margin-bottom:8px}
+  .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  .logo-text{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden}
+  .logo-sub{font-size:11px;color:var(--text3)}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;border-radius:0;transition:background .15s;color:var(--text2);white-space:nowrap;overflow:hidden;font-size:13px}
+  .nav-item:hover{background:var(--bg3);color:var(--text)}
+  .nav-item.active{background:var(--bg4);color:var(--accent-light);border-right:2px solid var(--accent)}
+  .nav-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}
+  .nav-section{padding:12px 16px 4px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text3)}
+  .sidebar-footer{margin-top:auto;border-top:1px solid var(--border);padding:12px}
+  .user-badge{display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--radius);background:var(--bg3);cursor:pointer}
+  .avatar{width:32px;height:32px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:12px;flex-shrink:0}
+  .user-info{overflow:hidden}
+  .user-name{font-size:13px;font-weight:500;white-space:nowrap}
+  .user-role{font-size:11px;color:var(--text3);white-space:nowrap}
+
+  /* Topbar */
+  .topbar-title{font-weight:600;font-size:16px;flex:1}
+  .topbar-actions{display:flex;align-items:center;gap:8px}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);border:1px solid var(--border2);background:var(--bg3);color:var(--text);cursor:pointer;font-size:13px;font-family:var(--font);transition:all .15s;white-space:nowrap}
+  .btn:hover{background:var(--bg4);border-color:var(--border2)}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn-primary:hover{background:var(--accent2);border-color:var(--accent2)}
+  .btn-success{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+  .btn-danger{background:var(--red-bg);border-color:var(--red);color:var(--red)}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  .btn-icon{padding:7px;width:36px;height:36px;justify-content:center}
+
+  /* Cards */
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+  .card-sm{padding:14px 16px}
+  .card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .card-title{font-size:14px;font-weight:600}
+
+  /* Stats */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+  .stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
+  .stat-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .stat-value{font-size:26px;font-weight:700;line-height:1}
+  .stat-sub{font-size:11px;color:var(--text2);margin-top:4px}
+  .stat-accent{border-top:2px solid var(--accent)}
+  .stat-green{border-top:2px solid var(--green)}
+  .stat-amber{border-top:2px solid var(--amber)}
+  .stat-red{border-top:2px solid var(--red)}
+
+  /* Tables */
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text3);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+  td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--bg3)}
+
+  /* Badges */
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500}
+  .badge-pending{background:var(--amber-bg);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+  .badge-approved{background:var(--green-bg);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+  .badge-rejected{background:var(--red-bg);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+  .badge-processing{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+  .badge-duplicate{background:var(--purple-bg);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+  .badge-invoice{background:var(--blue-bg);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+  .badge-credit{background:var(--purple-bg);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+
+  /* Forms */
+  .form-group{margin-bottom:16px}
+  .form-label{display:block;font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500}
+  .form-input{width:100%;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:var(--font);font-size:13px;outline:none;transition:border .15s}
+  .form-input:focus{border-color:var(--accent)}
+  .form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239095b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+
+  /* Upload */
+  .upload-zone{border:2px dashed var(--border2);border-radius:var(--radius-lg);padding:40px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3)}
+  .upload-zone:hover,.upload-zone.dragover{border-color:var(--accent);background:rgba(99,102,241,.05)}
+  .upload-icon{font-size:40px;margin-bottom:12px;opacity:.5}
+  .upload-title{font-size:15px;font-weight:600;margin-bottom:6px}
+  .upload-sub{font-size:12px;color:var(--text3)}
+
+  /* Workflow Steps */
+  .workflow-steps{display:flex;align-items:center;gap:0;margin-bottom:20px;background:var(--bg3);border-radius:var(--radius-lg);padding:4px}
+  .wf-step{flex:1;text-align:center;padding:8px 4px;border-radius:var(--radius);font-size:12px;color:var(--text3);transition:all .2s}
+  .wf-step.done{color:var(--green)}
+  .wf-step.active{background:var(--bg4);color:var(--accent-light);font-weight:600}
+  .wf-step.rejected{color:var(--red)}
+  .wf-connector{width:24px;height:2px;background:var(--border);flex-shrink:0}
+  .wf-connector.done{background:var(--green)}
+
+  /* Modals */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px)}
+  .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-xl);padding:24px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+  .modal-title{font-size:16px;font-weight:700}
+  .modal-close{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;color:var(--text3);background:none;border:none;font-size:18px;transition:background .15s}
+  .modal-close:hover{background:var(--bg4);color:var(--text)}
+
+  /* Toast */
+  #toast-container{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+  .toast{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 16px;font-size:13px;box-shadow:var(--shadow);min-width:240px;animation:slideIn .2s ease;display:flex;align-items:center;gap:10px}
+  .toast-success{border-left:3px solid var(--green)}
+  .toast-error{border-left:3px solid var(--red)}
+  .toast-info{border-left:3px solid var(--accent)}
+  @keyframes slideIn{from{transform:translateX(40px);opacity:0}to{transform:translateX(0);opacity:1}}
+
+  /* Login */
+  #login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:flex-start;justify-content:center;z-index:9000;overflow-y:auto;padding:24px 16px}
+  .login-card{width:380px;max-width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-xl);padding:28px;box-shadow:var(--shadow);margin:auto}
+  .login-logo{text-align:center;margin-bottom:16px}
+  .login-logo-icon{width:44px;height:44px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:22px}
+  .login-title{font-size:22px;font-weight:800;text-align:center;margin-bottom:4px}
+  .login-sub{font-size:13px;color:var(--text3);text-align:center;margin-bottom:28px}
+  .demo-accounts{background:var(--bg3);border-radius:var(--radius);padding:10px;margin-top:12px}
+  .demo-title{font-size:11px;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em}
+  .demo-account{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text2);padding:4px 0;cursor:pointer;border-bottom:1px solid var(--border);gap:8px}
+  .demo-account:last-child{border-bottom:none}
+  .demo-account:hover{color:var(--accent-light)}
+
+  /* Tabs */
+  .tabs{display:flex;gap:2px;background:var(--bg3);border-radius:var(--radius);padding:3px;margin-bottom:20px}
+  .tab{flex:1;text-align:center;padding:7px 12px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text3);transition:all .15s}
+  .tab.active{background:var(--bg2);color:var(--text);font-weight:500;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+
+  /* Progress */
+  .progress-bar{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
+  .progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+
+  /* Tags */
+  .tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;background:var(--bg4);color:var(--text2)}
+
+  /* Dividers */
+  .divider{height:1px;background:var(--border);margin:16px 0}
+
+  /* AI insight box */
+  .ai-box{background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(168,85,247,.05));border:1px solid rgba(99,102,241,.3);border-radius:var(--radius-lg);padding:16px}
+  .ai-box-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:600;font-size:13px;color:var(--accent-light)}
+
+  /* Responsive helpers */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .flex-gap{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .mt{margin-top:16px}
+  .mb{margin-bottom:16px}
+  .text-sm{font-size:12px;color:var(--text2)}
+  .text-muted{color:var(--text3)}
+  .text-right{text-align:right}
+  .text-green{color:var(--green)}
+  .text-red{color:var(--red)}
+  .text-amber{color:var(--amber)}
+  .text-accent{color:var(--accent-light)}
+  .font-bold{font-weight:700}
+  .w-full{width:100%}
+  .hidden{display:none!important}
+  .page{display:none}
+  .page.active{display:block}
+  #sidebar.collapsed .nav-section,
+  #sidebar.collapsed .logo-text,
+  #sidebar.collapsed .nav-label,
+  #sidebar.collapsed .user-info{display:none}
+  #sidebar.collapsed .nav-item{justify-content:center;padding:9px}
+  #sidebar.collapsed .sidebar-logo{justify-content:center;padding:16px 8px 8px}
+  .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .extraction-result{background:var(--bg3);border-radius:var(--radius-lg);padding:16px;margin-top:16px}
+  .extraction-field{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .extraction-field:last-child{border-bottom:none}
+  .extraction-key{color:var(--text3)}
+  .extraction-val{font-weight:500;color:var(--text)}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon"><img src="https://img.icons8.com/fluency/48/document.png" width="28" height="28" alt="DocFlow"></div>
+      <div class="login-title">DocFlow</div>
+      <div class="login-sub">Document Management System</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email address</label>
+      <input class="form-input" id="login-email" type="email" placeholder="you@company.com" value="admin@docflow.com">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" id="login-pass" type="password" placeholder="••••••••" value="password">
+    </div>
+    <button class="btn btn-primary w-full" style="justify-content:center;padding:11px" onclick="doLogin()">Sign in</button>
+    <div class="demo-accounts">
+      <div class="demo-title">Demo accounts — click any to sign in</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px;padding:6px 8px;background:var(--bg2);border-radius:6px;border:1px solid var(--border)">
+        🔑 All accounts use password: <strong style="color:var(--accent-light);letter-spacing:.04em">password</strong>
+      </div>
+      <div class="demo-account" onclick="fillDemo('admin@docflow.com','password','admin')">admin@docflow.com <span style="color:var(--text3)">Admin (Finance)</span></div>
+      <div class="demo-account" onclick="fillDemo('manager@docflow.com','password','manager')">manager@docflow.com <span style="color:var(--text3)">Manager</span></div>
+      <div class="demo-account" onclick="fillDemo('reviewer@docflow.com','password','reviewer')">reviewer@docflow.com <span style="color:var(--text3)">Reviewer</span></div>
+      <div class="demo-account" onclick="fillDemo('viewer@docflow.com','password','viewer')">viewer@docflow.com <span style="color:var(--text3)">Viewer</span></div>
+    </div>
+  </div>
+</div>
+
+<button id="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+<script>document.body.classList.add('light-mode');</script>
+
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">
+        <img src="https://img.icons8.com/fluency/32/document.png" width="20" height="20" alt="DocFlow">
+      </div>
+      <div class="logo-text">DocFlow<div class="logo-sub">v2.0</div></div>
+    </div>
+    <div class="nav-section">Main</div>
+    <div class="nav-item active" onclick="showPage('dashboard',this)">
+      <span class="nav-icon"><img src="https://img.icons8.com/fluency/20/home.png" width="18" height="18" alt=""></span><span class="nav-label">Dashboard</span>
+    </div>
+    <div class="nav-item" onclick="showPage('upload',this)">
+      <span class="nav-icon"><img src="https://img.icons8.com/fluency/20/upload.png" width="18" height="18" alt=""></span><span class="nav-label">Upload Documents</span>
+    </div>
+    <div class="nav-item" onclick="showPage('documents',this)">
+      <span class="nav-icon"><img src="https://img.icons8.com/fluency/20/folder-invoices.png" width="18" height="18" alt=""></span><span class="nav-label">All Documents</span>
+    </div>
+    <div class="nav-section">Workflow</div>
+    <div class="nav-item" onclick="showPage('approvals',this)">
+      <span class="nav-icon"><img src="https://img.icons8.com/fluency/20/approve-and-update.png" width="18" height="18" alt=""></span><span class="nav-label">Approvals</span>
+    </div>
+    <div class="nav-item" onclick="showPage('duplicates',this)">
+      <span class="nav-icon"><img src="https://img.icons8.com/fluency/20/copy.png" width="18" height="18" alt=""></span><span class="nav-label">Duplicates</span>
+    </div>
+    <div class="nav-section">Analytics</div>
+    <div class="nav-item" onclick="showPage('reports',this)">
+      <span class="nav-icon"><img src="https://img.icons8.com/fluency/20/bar-chart.png" width="18" height="18" alt=""></span><span class="nav-label">Reports</span>
+    </div>
+    <div class="nav-item" onclick="showPage('insights',this)">
+      <span class="nav-icon"><img src="https://img.icons8.com/fluency/20/artificial-intelligence.png" width="18" height="18" alt=""></span><span class="nav-label">AI Insights</span>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-badge">
+        <div class="avatar" id="user-avatar">A</div>
+        <div class="user-info">
+          <div class="user-name" id="user-name">Admin</div>
+          <div class="user-role" id="user-role">Administrator</div>
+        </div>
+      </div>
+      <button class="btn w-full mt" style="justify-content:center;margin-top:8px" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="topbar">
+      <button class="btn btn-icon" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-actions">
+        <button class="btn btn-sm" onclick="showPage('upload', document.querySelector('[onclick*=upload]'))">+ Upload</button>
+        <span id="topbar-user" style="font-size:13px;color:var(--text2)">Admin</span>
+      </div>
+    </div>
+    <div id="content">
+
+      <div id="page-dashboard" class="page active">
+        <div class="stats-grid" id="dash-stats"></div>
+        <div class="grid-2" style="margin-bottom:24px">
+          <div class="card">
+            <div class="card-header"><div class="card-title">Documents by Status</div></div>
+            <div style="position:relative; height:220px; width:100%">
+               <canvas id="chart-status"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">Monthly Spend</div></div>
+            <div style="position:relative; height:220px; width:100%">
+               <canvas id="chart-spend"></canvas>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Recent Documents</div>
+            <button class="btn btn-sm" onclick="showPage('documents',document.querySelector('[onclick*=documents]'))">View all</button>
+          </div>
+          <div class="table-wrap" id="dash-recent"></div>
+        </div>
+      </div>
+
+      <div id="page-upload" class="page">
+        <div class="grid-2">
+          <div>
+            <div class="card mb">
+              <div class="card-title mb" style="margin-bottom:16px">Upload Document</div>
+              <div class="form-group">
+                <label class="form-label">Document Type</label>
+                <select class="form-input form-select" id="doc-type">
+                  <option value="invoice">Invoice</option>
+                  <option value="credit_note">Credit Note</option>
+                </select>
+              </div>
+              <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <div class="upload-icon"><img src="https://img.icons8.com/fluency/64/upload-to-cloud.png" width="48" height="48" alt=""></div>
+                <div class="upload-title">Drop file or click to browse</div>
+                <div class="upload-sub">PDF, PNG, JPG, DOCX — max 10MB</div>
+                <input type="file" id="file-input" style="display:none" accept=".pdf,.png,.jpg,.jpeg,.docx" onchange="handleFileSelect(event)">
+              </div>
+              <div id="file-info" class="hidden mt">
+                <div class="card card-sm" style="background:var(--bg3)">
+                  <div style="display:flex;align-items:center;justify-content:space-between">
+                    <div style="display:flex;align-items:center;gap:10px">
+                      <span><img src="https://img.icons8.com/fluency/32/document.png" width="24" height="24" alt=""></span>
+                      <div>
+                        <div id="file-name" style="font-size:13px;font-weight:500"></div>
+                        <div id="file-size" class="text-sm"></div>
+                      </div>
+                    </div>
+                    <button class="btn btn-sm btn-danger" onclick="clearFile()">Remove</button>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-primary w-full mt" style="justify-content:center;padding:10px" onclick="processUpload()">
+                <img src="https://img.icons8.com/fluency/20/artificial-intelligence.png" width="16" height="16" alt=""> Extract & Upload with AI
+              </button>
+            </div>
+          </div>
+          <div>
+            <div class="card mb" id="extraction-panel" style="display:none">
+              <div class="card-header">
+                <div class="card-title">AI Extraction Result</div>
+                <div id="extraction-status"></div>
+              </div>
+              <div id="extraction-body"></div>
+            </div>
+            <div class="card">
+              <div class="card-title" style="margin-bottom:12px">Upload Guidelines</div>
+              <ul style="color:var(--text2);font-size:13px;line-height:2;padding-left:16px">
+                <li>Only Invoices and Credit Notes accepted</li>
+                <li>AI will auto-extract vendor, date, amounts, VAT</li>
+                <li>Duplicate invoice numbers are automatically flagged</li>
+                <li>Documents enter 3-step approval workflow</li>
+                <li>You will be notified of approval status changes</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-documents" class="page">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">All Documents</div>
+            <div class="flex-gap">
+              <input class="form-input" id="doc-search" placeholder="Search..." style="width:200px" oninput="renderDocuments()">
+              <select class="form-input form-select" id="doc-filter-type" style="width:140px" onchange="renderDocuments()">
+                <option value="">All Types</option>
+                <option value="invoice">Invoice</option>
+                <option value="credit_note">Credit Note</option>
+              </select>
+              <select class="form-input form-select" id="doc-filter-status" style="width:140px" onchange="renderDocuments()">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap" id="docs-table"></div>
+        </div>
+      </div>
+
+      <div id="page-approvals" class="page">
+        <div class="card mb">
+          <div class="card-header"><div class="card-title">Approval Queue</div></div>
+          <div id="approval-role-info" class="ai-box mb" style="margin-bottom:16px"></div>
+          <div class="table-wrap" id="approvals-table"></div>
+        </div>
+      </div>
+
+      <div id="page-duplicates" class="page">
+        <div class="stats-grid" id="dup-stats" style="grid-template-columns:repeat(3,1fr)"></div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Flagged Duplicates</div></div>
+          <div class="table-wrap" id="dup-table"></div>
+        </div>
+      </div>
+
+      <div id="page-reports" class="page">
+        <div class="card mb">
+          <div class="card-title mb" style="margin-bottom:16px">Filters</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Date From</label>
+              <input type="date" class="form-input" id="rpt-from">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date To</label>
+              <input type="date" class="form-input" id="rpt-to">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Vendor</label>
+              <input class="form-input" id="rpt-vendor" placeholder="All vendors">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Approval Status</label>
+              <select class="form-input form-select" id="rpt-status">
+                <option value="">All</option>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
+          <div class="flex-gap">
+            <button class="btn btn-primary" onclick="generateReport()">Generate Report</button>
+            <button class="btn" onclick="exportExcel()"><img src="https://img.icons8.com/fluency/20/microsoft-excel-2019.png" width="16" height="16" alt=""> Export Excel</button>
+            <button class="btn" onclick="exportPDF()"><img src="https://img.icons8.com/fluency/20/pdf.png" width="16" height="16" alt=""> Export PDF</button>
+          </div>
+        </div>
+        <div id="report-output"></div>
+      </div>
+
+      <div id="page-insights" class="page">
+        <div class="card mb">
+          <div class="card-header">
+            <div class="card-title" style="display:flex;align-items:center;gap:8px"><img src="https://img.icons8.com/fluency/20/artificial-intelligence.png" width="18" height="18" alt=""> AI-Powered Insights</div>
+            <button class="btn btn-primary" onclick="generateInsights()">Refresh Insights</button>
+          </div>
+          <div id="insights-loading" class="hidden" style="text-align:center;padding:40px">
+            <div class="spinner" style="margin:0 auto 12px"></div>
+            <div class="text-sm">Analyzing your financial data…</div>
+          </div>
+          <div id="insights-output"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Ask AI a Question</div></div>
+          <div class="flex-gap">
+            <input class="form-input" id="ai-question" placeholder="e.g. Which vendor had the highest spend last month?" style="flex:1">
+            <button class="btn btn-primary" onclick="askAI()">Ask</button>
+          </div>
+          <div id="ai-answer" style="margin-top:16px"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="modal-container"></div>
+
+<script>
+const OPENAI_KEY = null; // Key lives in .env on the server — never in this file
+const API_ENDPOINT = 'http://localhost:3000/api';
+
+const USERS = {
+  'admin@docflow.com':    {pass:'password',name:'Sarah Admin',role:'admin',   label:'Administrator'},
+  'manager@docflow.com':  {pass:'password',name:'Mark Manager',role:'manager', label:'Finance Manager'},
+  'reviewer@docflow.com': {pass:'password',name:'Rachel Review',role:'reviewer',label:'Reviewer'},
+  'viewer@docflow.com':   {pass:'password',name:'Victor View',role:'viewer',  label:'Viewer'},
+};
+
+let currentUser = null;
+let selectedFile = null;
+let statusChart = null, spendChart = null;
+
+/* ── DATA STORE ─────────────────────────── */
+function getData() {
+  try { return JSON.parse(localStorage.getItem('docflow_data') || 'null') || defaultData(); }
+  catch { return defaultData(); }
+}
+function saveData(d) { localStorage.setItem('docflow_data', JSON.stringify(d)); }
+
+function defaultData() {
+  return { documents: [] };
+}
+
+/* ── AUTH ─────────────────────────────── */
+function fillDemo(e,p,r){document.getElementById('login-email').value=e;document.getElementById('login-pass').value=p}
+
+function toggleTheme(){
+  const isLight = document.body.classList.toggle('light-mode');
+  document.getElementById('theme-toggle').textContent = isLight ? '🌙 Dark' : '☀️ Light';
+}
+
+function doLogin(){
+  const e=document.getElementById('login-email').value.trim();
+  const p=document.getElementById('login-pass').value;
+  const u=USERS[e];
+  if(!u||u.pass!==p){toast('Invalid email or password','error');return;}
+  currentUser={email:e,...u};
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  document.getElementById('user-avatar').textContent=u.name[0];
+  document.getElementById('user-name').textContent=u.name;
+  document.getElementById('user-role').textContent=u.label;
+  document.getElementById('topbar-user').textContent=u.name;
+  initApp();
+}
+
+function doLogout(){
+  currentUser=null;
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+}
+
+/* ── NAVIGATION ──────────────────────── */
+function showPage(id,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el)el.classList.add('active');
+  const titles={dashboard:'Dashboard',upload:'Upload Documents',documents:'All Documents',
+    approvals:'Approval Queue',duplicates:'Duplicate Detection',reports:'Reports',insights:'AI Insights'};
+  document.getElementById('page-title').textContent=titles[id]||id;
+  if(id==='dashboard')renderDashboard();
+  if(id==='documents')renderDocuments();
+  if(id==='approvals')renderApprovals();
+  if(id==='duplicates')renderDuplicates();
+  if(id==='reports')generateReport();
+}
+
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed')}
+
+/* ── TOAST ────────────────────────────── */
+function toast(msg,type='info'){
+  const t=document.createElement('div');
+  t.className=`toast toast-${type}`;
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  t.innerHTML=`<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(()=>t.remove(),3500);
+}
+
+/* ── MODAL ────────────────────────────── */
+function showModal(title,body,actions=''){
+  const mc=document.getElementById('modal-container');
+  mc.innerHTML=`
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">${title}</div>
+          <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div id="modal-body">${body}</div>
+        ${actions?`<div class="flex-gap" style="margin-top:20px;justify-content:flex-end">${actions}</div>`:''}
+      </div>
+    </div>`;
+}
+function closeModal(){document.getElementById('modal-container').innerHTML='';}
+
+/* ── FILE UPLOAD HANDLING ──────────────────────── */
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{
+  e.preventDefault();
+  dz.classList.remove('dragover');
+  if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files[0]);
+});
+
+function handleFileSelect(e){
+  if(e.target.files.length) handleFiles(e.target.files[0]);
+}
+
+function handleFiles(file){
+  selectedFile = file;
+  document.getElementById('file-name').textContent = file.name;
+  document.getElementById('file-size').textContent = (file.size / (1024*1024)).toFixed(2) + ' MB';
+  document.getElementById('file-info').classList.remove('hidden');
+}
+
+function clearFile(){
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-info').classList.add('hidden');
+  document.getElementById('extraction-panel').style.display = 'none';
+}
+
+/* ── CORE APP INITIALIZATION ───────────────────── */
+function initApp(){
+  if(!localStorage.getItem('docflow_data')){
+    saveData(defaultData());
+  }
+  showPage('dashboard', document.querySelector('.nav-item'));
+}
+
+/* ── DASHBOARD RENDERING & CHARTS ───────────────── */
+function renderDashboard(){
+  const store = getData();
+  const docs = store.documents;
+  
+  const pending = docs.filter(d=>d.status==='pending').length;
+  const approved = docs.filter(d=>d.status==='approved').length;
+  const rejected = docs.filter(d=>d.status==='rejected').length;
+  const totalSpend = docs.filter(d=>d.status==='approved' && d.type==='invoice').reduce((a,b)=>a+b.total, 0) - 
+                     docs.filter(d=>d.status==='approved' && d.type==='credit_note').reduce((a,b)=>a+b.total, 0);
+
+  document.getElementById('dash-stats').innerHTML = `
+    <div class="stat-card stat-accent"><div class="stat-label">Total Documents</div><div class="stat-value">${docs.length}</div><div class="stat-sub">All time</div></div>
+    <div class="stat-card stat-amber"><div class="stat-label">Pending Approval</div><div class="stat-value">${pending}</div><div class="stat-sub">Awaiting action</div></div>
+    <div class="stat-card stat-green"><div class="stat-label">Approved Spend</div><div class="stat-value">R ${(totalSpend/1000).toFixed(1)}k</div><div class="stat-sub">Net approved invoices</div></div>
+    <div class="stat-card stat-red"><div class="stat-label">Rejected</div><div class="stat-value">${rejected}</div><div class="stat-sub">Flagged documents</div></div>
+  `;
+
+  // Status Chart
+  if(statusChart) statusChart.destroy();
+  const ctxStatus = document.getElementById('chart-status').getContext('2d');
+  statusChart = new Chart(ctxStatus, {
+    type: 'doughnut',
+    data: {
+      labels: ['Pending', 'Approved', 'Rejected'],
+      datasets: [{
+        data: docs.length ? [pending, approved, rejected] : [1, 1, 1],
+        backgroundColor: docs.length ? ['#f59e0b', '#22c55e', '#ef4444'] : ['#2e3147','#2e3147','#2e3147'],
+        borderWidth: 0
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#9095b8' } } } }
+  });
+
+  // Spend Chart
+  if(spendChart) spendChart.destroy();
+  const ctxSpend = document.getElementById('chart-spend').getContext('2d');
+  spendChart = new Chart(ctxSpend, {
+    type: 'bar',
+    data: {
+      labels: ['No data yet'],
+      datasets: [{
+        label: 'Approved Spend (ZAR)',
+        data: [0],
+        backgroundColor: '#6366f1'
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, scales: { x: { ticks: { color: '#9095b8' } }, y: { ticks: { color: '#9095b8' }, beginAtZero: true } }, plugins: { legend: { display: false } } }
+  });
+
+  // Recent Table
+  let html = `<table><thead><tr><th>ID</th><th>Vendor</th><th>Date</th><th>Total</th><th>Status</th></tr></thead><tbody>`;
+  if(!docs.length) {
+    html += `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text3)">
+      <img src="https://img.icons8.com/fluency/48/document.png" width="40" height="40" style="opacity:.3;display:block;margin:0 auto 10px" alt="">
+      No documents yet — upload your first document to get started.
+    </td></tr>`;
+  } else {
+    docs.slice(0, 5).forEach(d => {
+      html += `<tr>
+        <td><a href="#" onclick="viewDocumentDetails('${d.id}'); return false;">${d.id}</a></td>
+        <td>${d.vendor}</td>
+        <td>${d.date}</td>
+        <td>R ${d.total.toLocaleString()}</td>
+        <td><span class="badge badge-${d.status}">${d.status}</span></td>
+      </tr>`;
+    });
+  }
+  html += `</tbody></table>`;
+  document.getElementById('dash-recent').innerHTML = html;
+}
+
+/* ── DOCUMENT EXPLORER VIEW ────────────────────── */
+function renderDocuments(){
+  const store = getData();
+  const search = document.getElementById('doc-search').value.toLowerCase();
+  const typeFilter = document.getElementById('doc-filter-type').value;
+  const statusFilter = document.getElementById('doc-filter-status').value;
+
+  let filtered = store.documents.filter(d => {
+    const matchesSearch = d.vendor.toLowerCase().includes(search) || d.id.toLowerCase().includes(search) || d.invoiceNumber.toLowerCase().includes(search);
+    const matchesType = !typeFilter || d.type === typeFilter;
+    const matchesStatus = !statusFilter || d.status === statusFilter;
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  let html = `<table><thead><tr><th>ID</th><th>Type</th><th>Vendor</th><th>Invoice No</th><th>Date</th><th>Total Amount</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
+  if(!filtered.length) html += `<tr><td colspan="8" style="text-align:center;color:var(--text3)">No matching elements found.</td></tr>`;
+  filtered.forEach(d => {
+    html += `<tr>
+      <td><a href="#" onclick="viewDocumentDetails('${d.id}'); return false;">${d.id}</a></td>
+      <td><span class="badge badge-${d.type}">${d.type.replace('_',' ')}</span></td>
+      <td>${d.vendor} ${d.duplicate ? '⚠️' : ''}</td>
+      <td>${d.invoiceNumber}</td>
+      <td>${d.date}</td>
+      <td>R ${d.total.toLocaleString()}</td>
+      <td><span class="badge badge-${d.status}">${d.status}</span></td>
+      <td><button class="btn btn-sm" onclick="viewDocumentDetails('${d.id}')">View</button></td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  document.getElementById('docs-table').innerHTML = html;
+}
+
+/* ── DUPLICATE DETECTOR INTERFACE ──────────────── */
+function renderDuplicates(){
+  const store = getData();
+  const duplicates = store.documents.filter(d => d.duplicate || store.documents.some(x => x.id !== d.id && x.invoiceNumber === d.invoiceNumber && x.vendor === d.vendor));
+  
+  document.getElementById('dup-stats').innerHTML = `
+    <div class="stat-card stat-red"><div class="stat-label">Total Conflicts</div><div class="stat-value">${duplicates.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Rule Triggered</div><div class="stat-value" style="font-size:16px; margin-top:8px">Matching Vendor + Inv No</div></div>
+    <div class="stat-card"><div class="stat-label">Auto Isolation</div><div class="stat-value" style="font-size:16px; margin-top:8px; color:var(--amber)">Active Monitoring</div></div>
+  `;
+
+  let html = `<table><thead><tr><th>ID</th><th>Vendor</th><th>Invoice #</th><th>Total</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
+  if(!duplicates.length) html += `<tr><td colspan="6" style="text-align:center;color:var(--text3)">No duplicates identified. Integrity guaranteed.</td></tr>`;
+  duplicates.forEach(d => {
+    html += `<tr>
+      <td>${d.id}</td>
+      <td class="text-red">${d.vendor}</td>
+      <td><code>${d.invoiceNumber}</code></td>
+      <td>R ${d.total.toLocaleString()}</td>
+      <td><span class="badge badge-duplicate">Duplicate Flag</span></td>
+      <td>
+        <button class="btn btn-sm btn-danger" onclick="resolveDuplicate('${d.id}')">Dismiss Doc</button>
+      </td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  document.getElementById('dup-table').innerHTML = html;
+}
+
+function resolveDuplicate(id){
+  let store = getData();
+  store.documents = store.documents.filter(d=>d.id !== id);
+  saveData(store);
+  toast(`Document ${id} expunged from ledger.`, 'success');
+  renderDuplicates();
+}
+
+/* ── APPROVAL WORKFLOW ENGINE ──────────────────── */
+function renderApprovals(){
+  const store = getData();
+  const role = currentUser.role;
+
+  document.getElementById('approval-role-info').innerHTML = `
+    <div class="ai-box-header"><img src="https://img.icons8.com/fluency/20/key.png" width="16" height="16" alt=""> Signed in as: ${currentUser.label} (${currentUser.name})</div>
+    <p style="font-size:12px; color:var(--text2)">You can action documents at your approval tier.</p>
+  `;
+
+  // Logic: step 1 needs reviewer, step 2 needs manager, step 3 needs admin
+  let html = `<table><thead><tr><th>ID</th><th>Vendor</th><th>Total</th><th>Current Tier</th><th>Status</th><th>Actions</th></tr></thead><tbody>`;
+  
+  let matchCount = 0;
+  store.documents.forEach(d => {
+    if(d.status !== 'pending') return;
+    
+    let logicalOwner = false;
+    if(d.approvalStep === 0 && role === 'reviewer') logicalOwner = true;
+    if(d.approvalStep === 1 && role === 'manager') logicalOwner = true;
+    if(d.approvalStep === 2 && role === 'admin') logicalOwner = true;
+
+    if(logicalOwner) {
+      matchCount++;
+      html += `<tr>
+        <td><a href="#" onclick="viewDocumentDetails('${d.id}'); return false;">${d.id}</a></td>
+        <td>${d.vendor}</td>
+        <td>R ${d.total.toLocaleString()}</td>
+        <td>Level ${d.approvalStep + 1} (${role.toUpperCase()})</td>
+        <td><span class="badge badge-processing">Awaiting Signature</span></td>
+        <td>
+          <button class="btn btn-sm btn-success" onclick="signWorkflow('${d.id}', 'approved')">Approve</button>
+          <button class="btn btn-sm btn-danger" onclick="signWorkflow('${d.id}', 'rejected')">Reject</button>
+        </td>
+      </tr>`;
+    }
+  });
+
+  html += `</tbody></table>`;
+  if(matchCount === 0) html = `<div style="text-align:center; padding:20px; color:var(--text3)">No documents require your approval right now.</div>`;
+  document.getElementById('approvals-table').innerHTML = html;
+}
+
+function signWorkflow(id, action){
+  let store = getData();
+  let d = store.documents.find(x=>x.id === id);
+  if(!d) return;
+
+  d.approvals.push({
+    step: d.approvalStep + 1,
+    role: currentUser.role,
+    status: action,
+    comment: `Actioned via approval workflow.`,
+    date: new Date().toISOString(),
+    by: currentUser.name
+  });
+
+  if(action === 'rejected') {
+    d.status = 'rejected';
+  } else {
+    d.approvalStep += 1;
+    if(d.approvalStep >= 3){
+      d.status = 'approved';
+    }
+  }
+
+  saveData(store);
+  toast(`Document ${id} marked as ${action}.`, 'success');
+  renderApprovals();
+}
+
+/* ── DOCUMENT VIEWER (DETAILS MODAL) ───────────── */
+function viewDocumentDetails(id){
+  const store = getData();
+  const d = store.documents.find(x=>x.id === id);
+  if(!d) return;
+
+  let stepsHtml = '';
+  const tracks = ['Reviewer Signature', 'Manager Allocation Check', 'Administrative Clearance'];
+  for(let i=0; i<3; i++) {
+    let stateClass = '';
+    if(d.approvalStep > i) stateClass = 'done';
+    if(d.approvalStep === i && d.status === 'pending') stateClass = 'active';
+    if(d.status === 'rejected' && d.approvalStep === i) stateClass = 'rejected';
+    stepsHtml += `<div class="wf-step ${stateClass}">${tracks[i]}</div>`;
+    if(i < 2) stepsHtml += `<div class="wf-connector ${d.approvalStep > i ? 'done':''}"></div>`;
+  }
+
+  let logHtml = '<ul>';
+  d.approvals.forEach(a => {
+    logHtml += `<li style="font-size:12px; margin-bottom:6px; color:var(--text2)">
+      <strong>[Tier ${a.step} - ${a.status.toUpperCase()}]</strong> by ${a.by} on ${a.date.split('T')[0]}: <em>"${a.comment}"</em>
+    </li>`;
+  });
+  logHtml += '</ul>';
+  if(!d.approvals.length) logHtml = '<div class="text-sm text-muted">No history recorded yet.</div>';
+
+  let body = `
+    <div class="workflow-steps">${stepsHtml}</div>
+    <div class="grid-2">
+      <div>
+        <div class="form-group"><label class="form-label">Vendor</label><div class="form-input">${d.vendor}</div></div>
+        <div class="form-group"><label class="form-label">Invoice Number</label><div class="form-input">${d.invoiceNumber}</div></div>
+        <div class="form-group"><label class="form-label">Date</label><div class="form-input">${d.date}</div></div>
+      </div>
+      <div>
+        <div class="form-group"><label class="form-label">Subtotal</label><div class="form-input">R ${d.amount.toLocaleString()}</div></div>
+        <div class="form-group"><label class="form-label">VAT (15%)</label><div class="form-input">R ${d.vat.toLocaleString()}</div></div>
+        <div class="form-group"><label class="form-label">Total</label><div class="form-input font-bold" style="color:var(--accent-light)">R ${d.total.toLocaleString()}</div></div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="card-title mb" style="font-size:13px; margin-bottom:8px">Audit Trail</div>
+    ${logHtml}
+  `;
+
+  showModal(`Document — ${d.id}`, body, `<button class="btn btn-primary" onclick="closeModal()">Close</button>`);
+}
+
+/* ── AI EXTRACTION — PDF.js render + GPT-4o Vision ───────── */
+async function processUpload(){
+  if(!selectedFile){ toast('Please attach a file first.','error'); return; }
+
+  const panel = document.getElementById('extraction-panel');
+  panel.style.display = 'block';
+  document.getElementById('extraction-status').innerHTML = `<div class="spinner"></div>`;
+  document.getElementById('extraction-body').innerHTML = `<div class="text-sm text-muted">Reading document…</div>`;
+
+  try {
+    const fileType = selectedFile.type || '';
+    const isPDF    = fileType === 'application/pdf';
+    const isImage  = fileType.startsWith('image/');
+
+    let imageDataUrl; // what we'll send to GPT-4o
+
+    if (isImage) {
+      // Straight base64 data-URL
+      imageDataUrl = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = () => res(r.result);
+        r.onerror = () => rej(new Error('File read failed'));
+        r.readAsDataURL(selectedFile);
+      });
+
+    } else if (isPDF) {
+      // Render first page of PDF to a canvas via PDF.js, then export as PNG
+      document.getElementById('extraction-body').innerHTML = `<div class="text-sm text-muted">Rendering PDF page…</div>`;
+
+      const pdfBytes = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = () => res(new Uint8Array(r.result));
+        r.onerror = () => rej(new Error('File read failed'));
+        r.readAsArrayBuffer(selectedFile);
+      });
+
+      // Load PDF.js from CDN if not already loaded
+      if (!window.pdfjsLib) {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          s.onload = res; s.onerror = rej;
+          document.head.appendChild(s);
+        });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+
+      const pdfDoc  = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+      const page    = await pdfDoc.getPage(1);
+      const scale   = 2.0; // higher = better OCR quality
+      const viewport= page.getViewport({ scale });
+      const canvas  = document.createElement('canvas');
+      canvas.width  = viewport.width;
+      canvas.height = viewport.height;
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+      imageDataUrl  = canvas.toDataURL('image/png');
+
+    } else {
+      toast('Please upload a PDF or image file.','error');
+      document.getElementById('extraction-status').innerHTML = `<span class="badge badge-rejected">Unsupported Format</span>`;
+      document.getElementById('extraction-body').innerHTML   = `<div class="text-sm text-muted">Only PDF and image files are accepted.</div>`;
+      return;
+    }
+
+    document.getElementById('extraction-body').innerHTML = `<div class="text-sm text-muted">Sending to AI for extraction…</div>`;
+
+    const prompt = `You are a financial document extraction API for a South African AP system.
+Scan EVERY visible element of this document and extract ALL available data.
+Always return a single valid JSON object — no markdown, no prose, no refusals.
+
+Determine documentType: "invoice", "credit_note", or "other" (for any other document — still extract all data).
+
+JSON schema to return:
+{
+  "documentType": "invoice" | "credit_note" | "other",
+  "documentDescription": "what kind of document this appears to be",
+  "vendor": "supplier/vendor name",
+  "vendorAddress": "full vendor address if visible",
+  "vendorVatNumber": "vendor VAT reg number if visible",
+  "customerName": "billed-to company or person",
+  "customerAddress": "billed-to address if visible",
+  "invoiceNumber": "invoice/credit note/reference number",
+  "date": "document date YYYY-MM-DD",
+  "dueDate": "payment due date YYYY-MM-DD if visible",
+  "lineItems": [{ "description": "", "qty": 0, "unitPrice": 0, "lineTotal": 0 }],
+  "subtotal": 0,
+  "vat": 0,
+  "vatRate": 15,
+  "total": 0,
+  "currency": "ZAR",
+  "paymentTerms": "e.g. 30 days",
+  "bankDetails": "bank name, account, branch if visible",
+  "notes": "any other useful information on the document",
+  "confidence": 95
+}
+
+Extract whatever fields are present. Leave unknown numeric fields as 0 and unknown text fields as "".
+START WITH { END WITH }. JSON ONLY.`;
+
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',  },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 1500,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a document OCR and data extraction API. You always return valid JSON. You never refuse. Extract everything visible.'
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } }
+            ]
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error?.message || 'OpenAI API error');
+    }
+
+    const data    = await response.json();
+    const rawText = (data.choices?.[0]?.message?.content || '').trim();
+    const cleaned = rawText.replace(/^```json\s*/i,'').replace(/```\s*$/i,'').trim();
+    let result;
+    try { result = JSON.parse(cleaned); }
+    catch(_) {
+      const m = rawText.match(/\{[\s\S]*\}/);
+      result = m ? JSON.parse(m[0]) : {};
+    }
+
+    // Resolve type label
+    const systemType = result.documentType === 'credit_note' ? 'credit_note' : 'invoice';
+    const typeLabel  = result.documentType === 'credit_note' ? 'Credit Note'
+                     : result.documentType === 'other'       ? (result.documentDescription || 'Document')
+                     : 'Invoice';
+
+    const docObject = {
+      id          : 'DOC-' + Math.floor(Math.random()*9000+1000),
+      type        : systemType,
+      vendor      : result.vendor        || result.customerName || 'Unknown',
+      date        : result.date          || new Date().toISOString().split('T')[0],
+      invoiceNumber: result.invoiceNumber|| 'N/A',
+      amount      : +result.subtotal     || 0,
+      vat         : +result.vat          || 0,
+      total       : +result.total        || 0,
+      currency    : result.currency      || 'ZAR',
+      status      : 'pending',
+      approvalStep: 0,
+      approvals   : [],
+      duplicate   : false,
+      uploadedBy  : currentUser.email,
+      uploadedAt  : new Date().toISOString(),
+      fileName    : selectedFile.name,
+      notes       : result.notes         || ''
+    };
+
+    const confidence      = result.confidence || 90;
+    const confidenceColor = confidence >= 80 ? 'badge-approved' : confidence >= 60 ? 'badge-processing' : 'badge-pending';
+
+    // Build line items table if present
+    let lineItemsHtml = '';
+    if (result.lineItems && result.lineItems.length) {
+      lineItemsHtml = `
+        <div class="extraction-field" style="flex-direction:column; align-items:flex-start; gap:6px">
+          <span class="extraction-key">Line Items</span>
+          <table style="width:100%;font-size:11px;border-collapse:collapse">
+            <thead><tr style="background:var(--bg3)">
+              <th style="text-align:left;padding:4px 6px">Description</th>
+              <th style="text-align:right;padding:4px 6px">Qty</th>
+              <th style="text-align:right;padding:4px 6px">Unit Price</th>
+              <th style="text-align:right;padding:4px 6px">Total</th>
+            </tr></thead>
+            <tbody>
+              ${result.lineItems.map(li=>`<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:4px 6px">${li.description||''}</td>
+                <td style="text-align:right;padding:4px 6px">${li.qty||''}</td>
+                <td style="text-align:right;padding:4px 6px">R ${(+li.unitPrice||0).toLocaleString()}</td>
+                <td style="text-align:right;padding:4px 6px">R ${(+li.lineTotal||0).toLocaleString()}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    const field = (label, val) => val ? `<div class="extraction-field"><span class="extraction-key">${label}</span><span class="extraction-val">${val}</span></div>` : '';
+
+    document.getElementById('extraction-status').innerHTML = `<span class="badge ${confidenceColor}">Confidence: ${confidence}%</span>`;
+    document.getElementById('extraction-body').innerHTML = `
+      <div class="extraction-result">
+        ${field('Document Type', typeLabel)}
+        ${field('Vendor', result.vendor)}
+        ${field('Vendor Address', result.vendorAddress)}
+        ${field('Vendor VAT No.', result.vendorVatNumber)}
+        ${field('Billed To', result.customerName)}
+        ${field('Customer Address', result.customerAddress)}
+        ${field('Invoice / Ref #', result.invoiceNumber)}
+        ${field('Date', result.date)}
+        ${field('Due Date', result.dueDate)}
+        ${field('Payment Terms', result.paymentTerms)}
+        ${lineItemsHtml}
+        ${field('Subtotal', result.subtotal ? 'R ' + (+result.subtotal).toLocaleString() : '')}
+        ${field('VAT (' + (result.vatRate||15) + '%)', result.vat ? 'R ' + (+result.vat).toLocaleString() : '')}
+        <div class="extraction-field"><span class="extraction-key">Total</span><span class="extraction-val font-bold text-accent">R ${(+docObject.total).toLocaleString()}</span></div>
+        ${field('Bank Details', result.bankDetails)}
+        ${field('Notes', result.notes)}
+      </div>
+      <button class="btn btn-primary w-full mt" onclick="commitExtractedToLedger(${JSON.stringify(docObject).replace(/"/g,'&quot;')})">Save to Documents</button>
+    `;
+    toast('Extraction complete.', 'success');
+
+  } catch(err) {
+    console.error(err);
+    document.getElementById('extraction-status').innerHTML = `<span class="badge badge-rejected">Error</span>`;
+    document.getElementById('extraction-body').innerHTML   = `<div class="text-sm text-red">Extraction failed: ${err.message}</div>`;
+    toast('Extraction failed.', 'error');
+  }
+}
+
+function commitExtractedToLedger(docObject){
+  let store = getData();
+  store.documents.unshift(docObject);
+  saveData(store);
+  toast(`Document saved as ${docObject.id}`, 'success');
+  clearFile();
+}
+
+/* ── COMPREHENSIVE FINANCIAL ENGINE SYSTEM REPORTS ── */
+function generateReport(){
+  const store = getData();
+  const fVendor = document.getElementById('rpt-vendor').value.toLowerCase();
+  const fStatus = document.getElementById('rpt-status').value;
+  const fFrom = document.getElementById('rpt-from').value;
+  const fTo = document.getElementById('rpt-to').value;
+
+  let filtered = store.documents.filter(d => {
+    if(fVendor && !d.vendor.toLowerCase().includes(fVendor)) return false;
+    if(fStatus && d.status !== fStatus) return false;
+    if(fFrom && d.date < fFrom) return false;
+    if(fTo && d.date > fTo) return false;
+    return true;
+  });
+
+  let totalCombined = filtered.reduce((acc,curr)=>acc+curr.total, 0);
+
+  let html = `
+    <div class="card mt">
+      <div class="card-header">
+      <div class="card-title">Results (${filtered.length} items)</div>
+        <div class="font-bold text-accent">Total: R ${totalCombined.toLocaleString()}</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Vendor</th><th>Date</th><th>Invoice No</th><th>Subtotal</th><th>VAT</th><th>Gross total</th><th>Status</th></tr></thead>
+          <tbody>`;
+  
+  if(!filtered.length) html += `<tr><td colspan="8" style="text-align:center;color:var(--text3)">No documents match the selected filters.</td></tr>`;
+  
+  filtered.forEach(d => {
+    html += `<tr>
+      <td>${d.id}</td>
+      <td>${d.vendor}</td>
+      <td>${d.date}</td>
+      <td><code>${d.invoiceNumber}</code></td>
+      <td>R ${d.amount.toLocaleString()}</td>
+      <td>R ${d.vat.toLocaleString()}</td>
+      <td class="font-bold">R ${d.total.toLocaleString()}</td>
+      <td><span class="badge badge-${d.status}">${d.status}</span></td>
+    </tr>`;
+  });
+
+  html += `</tbody></table></div></div>`;
+  document.getElementById('report-output').innerHTML = html;
+}
+
+/* ── BI DATA FILE EXPORT TERMINALS ─────────────── */
+function exportExcel(){
+  const store = getData();
+  const simplifiedRows = store.documents.map(d => ({
+    ID: d.id, Type: d.type, Vendor: d.vendor, Reference: d.invoiceNumber, Date: d.date, Subtotal: d.amount, VAT: d.vat, GrossTotal: d.total, Status: d.status
+  }));
+  const worksheet = XLSX.utils.json_to_sheet(simplifiedRows);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Ledger Overview");
+  XLSX.writeFile(workbook, `DocFlow_System_Ledger_${new Date().toISOString().split('T')[0]}.xlsx`);
+  toast('Excel export downloaded.', 'success');
+}
+
+function exportPDF(){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const store = getData();
+  
+  doc.setFont("Helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("DocFlow Document Management Ledger Report", 14, 20);
+  doc.setFont("Helvetica", "normal");
+  doc.setFontSize(10);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+  
+  let offset = 40;
+  doc.setFont("Helvetica", "bold");
+  doc.text("Doc ID", 14, offset); doc.text("Vendor", 35, offset); doc.text("Date", 95, offset); doc.text("Gross Total", 135, offset); doc.text("Status", 175, offset);
+  doc.line(14, offset+2, 195, offset+2);
+  offset += 8;
+
+  doc.setFont("Helvetica", "normal");
+  store.documents.slice(0, 22).forEach(d => {
+    if(offset > 275) { doc.addPage(); offset = 20; }
+    doc.text(String(d.id), 14, offset);
+    doc.text(String(d.vendor.substring(0,25)), 35, offset);
+    doc.text(String(d.date), 95, offset);
+    doc.text(`R ${d.total.toLocaleString()}`, 135, offset);
+    doc.text(String(d.status.toUpperCase()), 175, offset);
+    offset += 8;
+  });
+
+  doc.save(`DocFlow_Financial_Report_${Date.now()}.pdf`);
+  toast('PDF exported.', 'success');
+}
+
+/* ── REAL AI INSIGHTS USING ANTHROPIC API ───── */
+async function generateInsights(){
+  const loading = document.getElementById('insights-loading');
+  const output = document.getElementById('insights-output');
+  loading.classList.remove('hidden');
+  output.innerHTML = '';
+
+  try {
+    const store = getData();
+    const docs = store.documents;
+
+    const summary = {
+      total: docs.length,
+      pending: docs.filter(d=>d.status==='pending').length,
+      approved: docs.filter(d=>d.status==='approved').length,
+      rejected: docs.filter(d=>d.status==='rejected').length,
+      invoices: docs.filter(d=>d.type==='invoice').length,
+      creditNotes: docs.filter(d=>d.type==='credit_note').length,
+      totalSpend: docs.filter(d=>d.status==='approved').reduce((a,b)=>a+b.total,0),
+      duplicates: docs.filter(d=>d.duplicate).length,
+      vendors: [...new Set(docs.map(d=>d.vendor))],
+      topVendors: Object.entries(docs.reduce((acc, d)=>{acc[d.vendor]=(acc[d.vendor]||0)+d.total;return acc;},{})).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    };
+
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `You are a financial analyst AI for a South African document management system (DocFlow). Analyze this document data and provide concise, actionable financial insights in HTML format (use <ul><li> lists, <strong> for emphasis). Keep it professional but brief — 4-6 bullet points max. Data: ${JSON.stringify(summary)}`
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || 'No insights returned.';
+
+    loading.classList.add('hidden');
+    output.innerHTML = `
+      <div class="ai-box mb">
+        <div class="ai-box-header"><img src="https://img.icons8.com/fluency/20/artificial-intelligence.png" width="16" height="16" alt=""> AI Insights — Powered by Claude</div>
+        <div style="font-size:13px; color:var(--text2); line-height:1.8">${reply}</div>
+      </div>
+    `;
+  } catch(err) {
+    loading.classList.add('hidden');
+    output.innerHTML = `<div class="text-sm text-red">Failed to generate insights: ${err.message}</div>`;
+    toast('AI insights failed.', 'error');
+  }
+}
+
+async function askAI(){
+  const q = document.getElementById('ai-question').value.trim();
+  if(!q) return;
+  const ans = document.getElementById('ai-answer');
+  ans.innerHTML = `<div class="spinner"></div>`;
+
+  try {
+    const store = getData();
+    const docs = store.documents;
+    const context = {
+      totalDocuments: docs.length,
+      pending: docs.filter(d=>d.status==='pending').length,
+      approved: docs.filter(d=>d.status==='approved').length,
+      rejected: docs.filter(d=>d.status==='rejected').length,
+      totalApprovedSpend: docs.filter(d=>d.status==='approved' && d.type==='invoice').reduce((a,b)=>a+b.total,0),
+      vendors: [...new Set(docs.map(d=>d.vendor))],
+      topVendorBySpend: Object.entries(docs.reduce((acc,d)=>{acc[d.vendor]=(acc[d.vendor]||0)+d.total;return acc;},{})).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([v,a])=>({vendor:v,total:a})),
+      duplicatesDetected: docs.filter(d=>d.duplicate).length
+    };
+
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: `You are a financial AI assistant for DocFlow, a South African document management system. Answer this question concisely based on the data provided. Use plain text only (no markdown). Data: ${JSON.stringify(context)}\n\nQuestion: ${q}`
+        }]
+      })
+    });
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || 'No response.';
+
+    ans.innerHTML = `<div class="card card-sm" style="background:var(--bg3); border:1px solid var(--accent)"><p style="font-size:13px"><img src="https://img.icons8.com/fluency/20/artificial-intelligence.png" width="14" height="14" alt=""> ${reply}</p></div>`;
+  } catch(err) {
+    ans.innerHTML = `<div class="text-sm text-red">AI request failed: ${err.message}</div>`;
+    toast('AI question failed.', 'error');
+  }
+}
+</script>
+</body>
+</html>
